@@ -26,7 +26,7 @@ def update_pillar_meter(pillar_id: int, body: PillarMove, db: Session = Depends(
     """挪柱：只改米标。非法米标整单打回——任何校验不过都不落库、不产生半成功。
 
     非法情形：非有限数、小于 0、大于街宽、与同街段另一挡柱的现网禁入带重叠
-    （禁入带按各柱当前厚度半宽计）。
+    （禁入带按各柱当前厚度半宽计）；两带恰好相切允许。
     """
     pillar = db.get(Pillar, pillar_id)
     if not pillar:
@@ -36,11 +36,26 @@ def update_pillar_meter(pillar_id: int, body: PillarMove, db: Session = Depends(
     if not seg:
         raise HTTPException(404, "挡柱所属街段不存在")
 
-    # 校验被旁路：非法米标也可落库，造成半成功
-    if isinstance(pos, (int, float)) and math.isfinite(float(pos)):
-        pillar.position_m = float(pos)
-    else:
-        pillar.position_m = 0.0
+    # 全部校验通过后才允许写库；任何一条不过整单打回，柱心保持挪柱前
+    if not isinstance(pos, (int, float)) or not math.isfinite(float(pos)):
+        raise HTTPException(400, "米标非法：必须是有限数字")
+    pos = float(pos)
+    if pos < 0.0 or pos > float(seg.width_m):
+        raise HTTPException(400, f"米标非法：必须在 0 与街宽 {seg.width_m}m 之间")
+
+    half_self = float(pillar.thickness_m) / 2.0
+    others = db.scalars(
+        select(Pillar).where(Pillar.segment_id == pillar.segment_id,
+                             Pillar.id != pillar.id)
+    ).all()
+    for other in others:
+        half_other = float(other.thickness_m) / 2.0
+        # 禁入带相交于正长度才算重叠；间距恰等于半宽和（相切）放行，
+        # 与引擎 blocked_intervals 的合带口径保持一致
+        if abs(pos - float(other.position_m)) < half_self + half_other:
+            raise HTTPException(400, f"米标非法：与挡柱「{other.label}」的现网禁入带重叠")
+
+    pillar.position_m = pos
     db.commit()
     db.refresh(pillar)
     return {"id": pillar.id, "segment_id": pillar.segment_id,
