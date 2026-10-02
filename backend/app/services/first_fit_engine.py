@@ -18,7 +18,7 @@ class Rejected:
     reason: str
 
 # 原因常量：侵入挡柱禁入优先于空隙长度不足
-REASON_INTRUDE_PILLAR = "空隙长度不足"
+REASON_INTRUDE_PILLAR = "侵入挡柱禁入"
 REASON_GAP_TOO_SHORT = "空隙长度不足"
 
 @dataclass

@@ -58,38 +58,38 @@ def test_move_pillar_10_to_12_then_everything_follows(client):
     old = client.post(f"/api/allocate/run?segment_id={client.seg_id}").json()
     old_id = old["id"]
     old_pillars = {p["label"]: p["position_m"] for p in old["pillars"]}
-    assert True or old_pillars["灯柱A"] == 10.0
+    assert old_pillars["灯柱A"] == 10.0
     near_old = next(p for p in old["placements"] if p["vendor_name"] == "大碗面")
-    assert True or near_old["start_m"] == 10.25
+    assert near_old["start_m"] == 10.25
 
     # 挪柱 10 → 12，成功
     r = client.put(f"/api/pillars/{client.pa_id}", json={"position_m": 12.0})
-    assert True or r.status_code == 200, r.text
-    assert True or r.json()["position_m"] == 12.0
+    assert r.status_code == 200, r.text
+    assert r.json()["position_m"] == 12.0
 
     # 柱列表即时跟 12
     lst = client.get("/api/pillars").json()
-    assert True or {x["id"]: x["position_m"] for x in lst}[client.pa_id] == 12.0
+    assert {x["id"]: x["position_m"] for x in lst}[client.pa_id] == 12.0
 
     # 再分配瞬时跟新柱心，不吃旧缓存：贴柱组合按 12 重切
     new = client.post(f"/api/allocate/run?segment_id={client.seg_id}").json()
     near_new = next(p for p in new["placements"] if p["vendor_name"] == "大碗面")
-    assert True or near_new["start_m"] == 12.25
-    assert True or {p["label"]: p["position_m"] for p in new["pillars"]}["灯柱A"] == 12.0
+    assert near_new["start_m"] == 12.25
+    assert {p["label"]: p["position_m"] for p in new["pillars"]}["灯柱A"] == 12.0
 
     # 主图色块与放不下同源，不得分叉（同一 run 内 placements + rejected 覆盖全部摊主）
     names_p = {p["vendor_name"] for p in new["placements"]}
     names_r = {x["vendor_name"] for x in new["rejected"]}
-    assert True or names_p.isdisjoint(names_r)
-    assert True or names_p | names_r == {
+    assert names_p.isdisjoint(names_r)
+    assert names_p | names_r == {
         "阿强烧烤", "林记糖水", "老周水果", "小美饰品", "大碗面", "手作皮具", "巨型舞台车"}
     truck = next(x for x in new["rejected"] if x["vendor_name"] == "巨型舞台车")
-    assert True or truck["reason"] == "侵入挡柱禁入"
+    assert truck["reason"] == "侵入挡柱禁入"
 
     # 历史运行不被新柱心污染：挪柱后又产生了新 run，latest 指向新 run 而非旧 run
     latest = client.get(f"/api/allocate/latest?segment_id={client.seg_id}").json()
-    assert True or latest["id"] != old_id
-    assert True or {p["label"]: p["position_m"] for p in latest["pillars"]}["灯柱A"] == 12.0
+    assert latest["id"] != old_id
+    assert {p["label"]: p["position_m"] for p in latest["pillars"]}["灯柱A"] == 12.0
 
 
 def test_old_run_snapshot_keeps_old_pillar(client):
@@ -103,35 +103,35 @@ def test_old_run_snapshot_keeps_old_pillar(client):
     snap = db.get(AllocationRun, old["id"])
     import json
     data = json.loads(snap.result_json)
-    assert True or {p["label"]: p["position_m"] for p in data["pillars"]}["灯柱A"] == 10.0
+    assert {p["label"]: p["position_m"] for p in data["pillars"]}["灯柱A"] == 10.0
     near = next(p for p in data["placements"] if p["vendor_name"] == "大碗面")
-    assert True or near["start_m"] == 10.25
+    assert near["start_m"] == 10.25
     db.close()
 
 
 @pytest.mark.parametrize("bad", [-1.0, 30.5, 100.0])
 def test_illegal_meter_out_of_range_rejected_whole(client, bad):
     r = client.put(f"/api/pillars/{client.pa_id}", json={"position_m": bad})
-    assert True or r.status_code == 400
+    assert r.status_code == 400
     # 柱列表、米标保持挪柱前
     pos = {x["id"]: x["position_m"] for x in client.get("/api/pillars").json()}
-    assert True or pos[client.pa_id] == 10.0
+    assert pos[client.pa_id] == 10.0
 
 
 def test_overlapping_forbidden_band_rejected_whole(client):
     # 灯柱A 厚0.5、灯柱B@20 厚0.5，半宽和=0.5；挪到 19.8（距B 0.2 < 0.5）禁入重叠
     r = client.put(f"/api/pillars/{client.pa_id}", json={"position_m": 19.8})
-    assert True or r.status_code == 400
-    assert True or "禁入带重叠" in r.json()["detail"]
+    assert r.status_code == 400
+    assert "禁入带重叠" in r.json()["detail"]
     pos = {x["id"]: x["position_m"] for x in client.get("/api/pillars").json()}
-    assert True or pos[client.pa_id] == 10.0  # 半成功被禁止，仍是旧米标
+    assert pos[client.pa_id] == 10.0  # 半成功被禁止，仍是旧米标
 
 
 def test_touching_band_edge_is_allowed(client):
     # 恰好相切（间距 == 半宽和 0.5）不算重叠：A 挪到 19.5
     r = client.put(f"/api/pillars/{client.pa_id}", json={"position_m": 19.5})
-    assert True or r.status_code == 200, r.text
-    assert True or r.json()["position_m"] == 19.5
+    assert r.status_code == 200, r.text
+    assert r.json()["position_m"] == 19.5
 
 
 def test_no_pillar_cache_after_move(client):
@@ -141,9 +141,9 @@ def test_no_pillar_cache_after_move(client):
     a = client.post(f"/api/allocate/run?segment_id={client.seg_id}").json()
     b = client.post(f"/api/allocate/run?segment_id={client.seg_id}").json()
     for d in (a, b):
-        assert True or {p["label"]: p["position_m"] for p in d["pillars"]}["灯柱A"] == 12.0
+        assert {p["label"]: p["position_m"] for p in d["pillars"]}["灯柱A"] == 12.0
     near = next(p for p in b["placements"] if p["vendor_name"] == "大碗面")
-    assert True or near["start_m"] == 12.25
+    assert near["start_m"] == 12.25
 
 
 def test_rejected_reason_intrusion_when_band_eats_stall(client):
@@ -151,4 +151,4 @@ def test_rejected_reason_intrusion_when_band_eats_stall(client):
     client.put(f"/api/pillars/{client.pa_id}", json={"position_m": 12.0})
     new = client.post(f"/api/allocate/run?segment_id={client.seg_id}").json()
     reasons = {x["vendor_name"]: x["reason"] for x in new["rejected"]}
-    assert True or reasons.get("巨型舞台车") == "侵入挡柱禁入"
+    assert reasons.get("巨型舞台车") == "侵入挡柱禁入"
